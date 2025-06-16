@@ -1,9 +1,14 @@
 import json
-import logging
+from config import logger
+from utils import create_response
 
-# Configure logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+def parse_cookies(cookie_string):
+    """
+    Parses a cookie string into a dictionary.
+    """
+    if not cookie_string:
+        return {}
+    return dict(cookie.split('=', 1) for cookie in cookie_string.split('; '))
 
 def lambda_handler(event, context):
     """
@@ -23,42 +28,28 @@ def lambda_handler(event, context):
     try:
         parsed_data = {}
         
-        # Check if this is an API Gateway event
-        if 'body' in event:
-            # Parse the body if it's a string
+        # API Gateway event
+        if 'body' in event and event['body'] is not None:
             if isinstance(event['body'], str):
                 try:
                     parsed_data.update(json.loads(event['body']))
                 except json.JSONDecodeError:
-                    # If body is not JSON, use it as is
-                    parsed_data['body'] = event['body']
+                    # If body is not a valid JSON, it might be a different format.
+                    # This could be handled more gracefully depending on expected inputs.
+                    logger.warning(f"Request body is not a valid JSON string: {event['body']}")
+                    parsed_data['raw_body'] = event['body']
             else:
-                parsed_data.update(event['body'])
-                
-            # Handle cookies from API Gateway
+                parsed_data.update(event.get('body', {}))
+
             if 'headers' in event and 'Cookie' in event['headers']:
-                cookies = event['headers']['Cookie']
-                # Parse cookies into a dictionary
-                cookie_dict = dict(
-                    cookie.split('=', 1) for cookie in cookies.split('; ')
-                )
-                parsed_data.update(cookie_dict)
-                
+                parsed_data['cookies'] = parse_cookies(event['headers']['Cookie'])
+        
+        # Direct Lambda invocation
         else:
-            # Direct Lambda invocation - use event as is
             parsed_data.update(event)
             
-        return {
-            "statusCode": 200,
-            "body": parsed_data
-        }
+        return create_response(200, parsed_data)
         
     except Exception as e:
-        logger.error(f"Error parsing event: {str(e)}")
-        return {
-            "statusCode": 400,
-            "body": {
-                "error": "Failed to parse event",
-                "message": str(e)
-            }
-        }
+        logger.error(f"Error parsing event: {e}")
+        return create_response(400, {"error": "Failed to parse event", "message": str(e)})
