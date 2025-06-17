@@ -26,6 +26,7 @@ def lambda_handler(event, context):
         }
     """
     try:
+        print(f"DEBUG: ParseEvent received event: {json.dumps(event, default=str)}")
         parsed_data = {}
         
         # API Gateway event
@@ -47,7 +48,8 @@ def lambda_handler(event, context):
         # Direct Lambda invocation
         else:
             parsed_data.update(event)
-            
+        
+        print(f"DEBUG: ParseEvent returning parsed_data: {json.dumps(parsed_data, default=str)}")
         return create_response(200, parsed_data)
         
     except Exception as e:
